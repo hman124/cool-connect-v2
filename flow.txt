@@ -1,0 +1,19 @@
+emit -> joinRoom(roomId)
+
+case:error
+    recv -> error(message: room not found)
+
+case:success
+    recv -> joinedRoom(userId)
+    recv -> status(waiting | playing)
+
+    while:waiting
+        recv -> status(playing)
+    
+    while:playing
+        recv -> turn(userId)
+        option:data
+            emit -> data(data)
+            recv -> data(data)
+        option:leave
+            emit -> leaveRoom()

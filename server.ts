@@ -39,10 +39,10 @@ interface User {
     turnIdx: number
 }
 
-async function joinRoom(roomId: string, socketId: string): Promise<string | null> {
-    const roomList = await database.run(`
+function joinRoom(roomId: string, socketId: string): string | null {
+    const roomList = database.query(`
         SELECT * FROM rooms WHERE roomId=?
-    `, roomId);
+    `, [roomId]);
 
     // emit error if room not found
     if (roomList.length == 0) {
@@ -50,7 +50,7 @@ async function joinRoom(roomId: string, socketId: string): Promise<string | null
     }
 
     // clear out any other users
-    await database.run(`DELETE FROM users WHERE socketId=?`, socketId);
+    database.query(`DELETE FROM users WHERE socketId=?`, [socketId]);
 
     // create a new user instance
     const thisUserId = crypto.randomBytes(8).toString("hex");
@@ -67,30 +67,31 @@ async function joinRoom(roomId: string, socketId: string): Promise<string | null
         0 :
         Math.max(userList.map((x: User) => x.turnIdx)) + 1;
 
-    await database.run(`
+    database.query(`
         INSERT INTO users
         (userId, roomId, createdAt, socketId, isHost, lastPingAt, turnIdx)
         VALUES (?,?,?,?,?,?,?)
-    `, thisUserId, roomId, nowTime, socketId, 0, nowTime, nextIdx);
+    `, [thisUserId, roomId, nowTime, socketId, 0, nowTime, nextIdx]);
 
     return thisUserId;
 }
 
-async function leaveRoom(socketId: string): Promise<{ userId: string; roomId: string } | null> {
-    const userList = await database.all(`
+function leaveRoom(socketId: string): { userId: string; roomId: string } | null {
+    const userList = database.query(`
         SELECT userId,roomId 
         FROM users 
         WHERE socketId=?`,
-        socketId);
+        [socketId]);
 
     if (userList.length == 0) {
         return null;
     }
 
     const thisUser = userList[0];
-    await database.run("DELETE FROM users WHERE userId=?", thisUser.userId);
+    const [userId, roomId]: [string, string] = thisUser;
+    database.query("DELETE FROM users WHERE userId=?", [userId]);
 
-    return thisUser;
+    return {userId, roomId};
 }
 
 async function updatePing(socketId: string): Promise<void> {
@@ -102,9 +103,7 @@ async function updatePing(socketId: string): Promise<void> {
 }
 
 async function validateTurnToken(turnToken: string) {
-    await database.all("SELECT * FROM turns WHERE turnToken=?", turnToken);
-
-
+    await database.all("SELECT * FROM turns WHERE turnToken=?", turnToken);d
 }
 
 io.on("connection", socket => {

@@ -1,0 +1,11 @@
+{
+    "imports": {
+      "sqlite3": "npm:sqlite3",
+      "cookie-parser": "npm:cookie-parser",
+      "cors": "npm:cors",
+      "oak": "https://deno.land/x/oak@v17.1.3/mod.ts",
+      "socket.io": "https://deno.land/x/socket_io@0.2.0/mod.ts",
+      "denoHttp": "https://deno.land/std@0.150.0/http/server.ts"
+    }
+  }
+  

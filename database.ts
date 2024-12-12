@@ -1,8 +1,8 @@
-import { dirname } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { dirname } from "node:path";
+import { fileURLToPath } from "node:url";
 import { existsSync } from "node:fs";
-import sqlite3 from 'sqlite3';
-import { promisify } from 'node:util';
+import { promisify } from "node:util";
+import sqlite3 from "sqlite3";
     
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const dbPath = __dirname + "/.data/connect_v1.0.0.db";
@@ -14,20 +14,23 @@ export const database = new sqlite3.Database(dbPath);
 export const all = promisify(database.all.bind(database));
 export const run = promisify(database.run.bind(database));
 
+export default {all, run};
+
 if(!dbExists) {
     // set up tables
-    dababase.run(`
+    database.run(`
         CREATE TABLE users(
           key INTEGER PRIMARY KEY,
           userId TEXT,
           createdAt INT,
           socketId TEXT,
           lastPingAt INT,
-          isHost BOOL
+          isHost BOOL,
+          turnIdx INT
         )    
     `);
 
-    dababase.run(`
+    database.run(`
       CREATE TABLE rooms(
         key INTEGER PRIMARY KEY,
         roomId TEXT,

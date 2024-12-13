@@ -1,6 +1,6 @@
 {
     "imports": {
-      "sqlite3": "npm:sqlite3",
+      "sqlite": "https://deno.land/x/sqlite@v3.9.1/mod.ts",
       "cookie-parser": "npm:cookie-parser",
       "cors": "npm:cors",
       "oak": "https://deno.land/x/oak@v17.1.3/mod.ts",

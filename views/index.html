@@ -1,1 +1,26 @@
-hello, world
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+</head>
+<body>
+
+    <p>Sockets</p>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.8.1/socket.io.js" integrity="sha512-8BHxHDLsOHx+flIrQ0DrZcea7MkHqRU5GbTHmbdzMRnAaoCIkZ97PqZcXJkKZckMMhqfoeaJE+DNUVuyoQsO3Q==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <script>
+        let socket = io();
+
+        socket.on("connect", ()=>{
+            alert("connected");
+
+            socket.emit("joinRoom", "sup");
+        });
+
+        socket.on("createdRoom", (x)=>console.log(x));
+        socket.on("joinedRoom", (x)=>console.log(x));
+        socket.on("error", (x)=>console.log(x));
+    </script>
+</body>
+</html>

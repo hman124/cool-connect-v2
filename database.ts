@@ -2,7 +2,7 @@ import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { existsSync } from "node:fs";
 
-import { DB } from "https://deno.land/x/sqlite/mod.ts";
+import { DB } from "sqlite";
 
 // Open or create a SQLite database file
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -10,7 +10,7 @@ const dbPath = __dirname + "/.data/connect_v1.0.0.db";
 
 const dbExists = existsSync(dbPath);
 
-const db = new DB("example.db");
+const db = new DB(dbPath);
 export default db;
 
 if(!dbExists) {
@@ -19,11 +19,12 @@ if(!dbExists) {
       CREATE TABLE users(
         key INTEGER PRIMARY KEY,
         userId TEXT,
+        userKey TEXT,
+        roomId TEXT,
         createdAt INT,
         socketId TEXT,
         lastPingAt INT,
-        isHost BOOL,
-        turnIdx INT
+        isHost BOOL
       )    
   `);
 

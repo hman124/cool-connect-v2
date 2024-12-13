@@ -4,40 +4,28 @@ import { Application, Router, send } from "oak";
 
 import database from "./database.ts";
 import crypto from "node:crypto";
+import { createBrotliCompress } from "node:zlib";
 
 const io = new SocketIOServer();
-
-// Handle Socket.IO events
-io.on("connection", (socket) => {
-    console.log(`Socket ${socket.id} connected`);
-
-    socket.emit("hello", "world");
-
-    socket.on("disconnect", (reason) => {
-        console.log(`Socket ${socket.id} disconnected due to ${reason}`);
-    });
-});
 
 // Create an Oak app
 const app = new Application();
 const router = new Router();
 
-router.get("/", (ctx) => {
+router.get("/", async (ctx) => {
     ctx.response.body = "Hello from Oak!";
-});
-
-router.use((ctx) => {
-    ctx.response.body = "404 error";
+    await send(ctx, "index.html", {
+        root: "./views"
+    })
 });
 
 app.use(router.routes());
 app.use(router.allowedMethods());
 
-interface User {
-    userId: string,
-    roomId: string,
-    turnIdx: number
-}
+app.use((ctx) => {
+    ctx.response.body = "404 error";
+    ctx.response.status = 404;
+});
 
 function joinRoom(roomId: string, socketId: string): string | null {
     const roomList = database.query(`
@@ -49,34 +37,31 @@ function joinRoom(roomId: string, socketId: string): string | null {
         return null;
     }
 
+    const userLength: number = database.query(`
+        SELECT userId 
+        FROM users 
+        WHERE roomId=?`, 
+        [roomId]
+    ).length;
+
     // clear out any other users
     database.query(`DELETE FROM users WHERE socketId=?`, [socketId]);
 
     // create a new user instance
-    const thisUserId = crypto.randomBytes(8).toString("hex");
-    const nowTime = Date.now();
-
-    // get the next turn index
-    const userList = database.run(`
-        SELECT turnIdx 
-        FROM users 
-        WHERE roomId=?`,
-        roomId);
-
-    const nextIdx = userList.length == 0 ?
-        0 :
-        Math.max(userList.map((x: User) => x.turnIdx)) + 1;
+    const userId = crypto.randomBytes(8).toString("hex");
+    const userKey = crypto.randomBytes(12).toString("hex");
 
     database.query(`
         INSERT INTO users
-        (userId, roomId, createdAt, socketId, isHost, lastPingAt, turnIdx)
-        VALUES (?,?,?,?,?,?,?)
-    `, [thisUserId, roomId, nowTime, socketId, 0, nowTime, nextIdx]);
+        (userId, roomId, createdAt, socketId, isHost, lastPingAt, userKey)
+        VALUES (?,?,?,?,?,?,?,?)
+    `, [userId, roomId, Date.now(), socketId, userLength == 0, Date.now(),userKey]);
 
-    return thisUserId;
+    return userId;
 }
 
 function leaveRoom(socketId: string): { userId: string; roomId: string } | null {
+
     const userList = database.query(`
         SELECT userId,roomId 
         FROM users 
@@ -88,27 +73,47 @@ function leaveRoom(socketId: string): { userId: string; roomId: string } | null 
     }
 
     const thisUser = userList[0];
-    const [userId, roomId]: [string, string] = thisUser;
+    const [userId, roomId]: [string, string] = thisUser[0] as [string, string];
     database.query("DELETE FROM users WHERE userId=?", [userId]);
 
-    return {userId, roomId};
+    return { userId, roomId };
 }
 
-async function updatePing(socketId: string): Promise<void> {
-    await database.run(`
+function updatePing(socketId: string): void {
+    database.query(`
         UPDATE users 
         SET lastPingAt=?
         WHERE socketId=?`,
-        Date.now(), socketId);
+        [Date.now(), socketId]
+    );
 }
 
-async function validateTurnToken(turnToken: string) {
-    await database.all("SELECT * FROM turns WHERE turnToken=?", turnToken);d
+function createRoom(): string {
+    const roomId: string = crypto.randomBytes(4).toString("hex");
+
+    database.query(`
+        INSERT INTO rooms (roomId, createdAt) 
+        VALUES (?,?)`, 
+        [roomId, Date.now()]
+    );
+
+    return roomId;
+}
+
+function validateTurnToken(turnToken: string) {
+    database.query("SELECT * FROM turns WHERE turnToken=?", [turnToken]);
 }
 
 io.on("connection", socket => {
-    socket.on("joinRoom", async roomId => {
-        const userId = await joinRoom(roomId, socket.id);
+
+    socket.on("createRoom", () => {
+        console.log("CREATING ROOM");
+        const roomId = createRoom();
+        socket.emit("createdRoom", roomId);
+    });
+
+    socket.on("joinRoom", roomId => {
+        const userId = joinRoom(roomId, socket.id);
         if (userId) {
             // emit user details
             socket.emit("joinedRoom", userId);
@@ -119,15 +124,15 @@ io.on("connection", socket => {
         }
     });
 
-    socket.on("leaveRoom", async () => {
-        const thisUser = await leaveRoom(socket.id);
+    socket.on("leaveRoom", () => {
+        const thisUser = leaveRoom(socket.id);
 
         if (!thisUser) { return; }
         io.to(thisUser.roomId).emit("userLeave", thisUser);
     });
 
-    socket.on("ping", async () => {
-        await updatePing(socket.id);
+    socket.on("ping", () => {
+        updatePing(socket.id);
         socket.emit("pong");
     })
 
@@ -135,16 +140,17 @@ io.on("connection", socket => {
     // game specific management functions
     // socket.on("play");
 
-    socket.on("diceRoll", async (dice, turnToken) => {
+    socket.on("diceRoll", (dice, turnToken) => {
 
         // const valid = await validateTurnToken();
         const result = dice.map((x: number) => Math.floor(Math.random() * x));
-        const userList = await database.all(`
+        const userList = database.query(`
             SELECT roomId FROM users WHERE socketId=?
-        `, socket.id);
+        `, [socket.id]);
 
         if (userList.length > 0) {
-            io.to(userList[0].roomId).emit("diceRollResult", result);
+            const roomId = userList[0][0] as string;
+            io.to(roomId).emit("diceRollResult", result);
         }
     });
 });

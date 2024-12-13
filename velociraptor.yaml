@@ -1,0 +1,3 @@
+scripts:
+  dev:
+    cmd: deno run --watch --allow-env --allow-read --allow-write --allow-ffi --allow-net server.ts

@@ -6,7 +6,7 @@ import { DB } from "sqlite";
 
 // Open or create a SQLite database file
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const dbPath = __dirname + "/.data/connect_v1.0.0.db";
+const dbPath = __dirname + "/.data/connect_v1.0.1.db";
 
 const dbExists = existsSync(dbPath);
 
@@ -20,6 +20,7 @@ if(!dbExists) {
         key INTEGER PRIMARY KEY,
         userId TEXT,
         userKey TEXT,
+        userData TEXT,
         roomId TEXT,
         createdAt INT,
         socketId TEXT,
@@ -33,7 +34,9 @@ if(!dbExists) {
       key INTEGER PRIMARY KEY,
       roomId TEXT,
       createdAt INT,
-      gameId TEXT
+      gameId TEXT,
+      roomData TEXT,
+      isWaiting BOOL
     )    
 `);
 

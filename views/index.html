@@ -7,20 +7,199 @@
 </head>
 <body>
 
-    <p>Sockets</p>
+    <button id="createRoom">Create Room</button>
+    <span id="roomIdText"></span>
+
+    <label>
+        Room Code
+        <input id="roomInput"/>
+    </label>
+    <button id="joinRoom">Join Room</button>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.8.1/socket.io.js" integrity="sha512-8BHxHDLsOHx+flIrQ0DrZcea7MkHqRU5GbTHmbdzMRnAaoCIkZ97PqZcXJkKZckMMhqfoeaJE+DNUVuyoQsO3Q==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
     <script>
-        let socket = io();
+        
+        class Connect {
+            constructor() {
+                this.status = "disconnected";
+                this.roomId = null;
+                this.userId = null;
+                this.userKey = null;
 
-        socket.on("connect", ()=>{
-            alert("connected");
+                try {
+                    this.socket = io();
+                } catch(err) {
+                    consoler.error("socket.io library not imported");
+                }
 
-            socket.emit("joinRoom", "sup");
-        });
+                this.socket.on("connect", () => {
+                    this.status = "connected";
+                });
+                
+                this.socket.on("disconnect", () => {
+                    this.status = "disconnected";
+                });
 
-        socket.on("createdRoom", (x)=>console.log(x));
-        socket.on("joinedRoom", (x)=>console.log(x));
-        socket.on("error", (x)=>console.log(x));
+                this.socket.on("joinedRoom", userId => {
+                    this.userId = userId;
+                });
+
+                this.socket.on("error", (error) => {
+                    console.error(error);
+                })
+            }
+
+            joinRoom(config) {
+                this.socket.emit("joinRoom", config);
+                
+                return new Promise((res, rej) => {
+                    const destroyEvents = () => {
+                        this.socket.off("error", errorHandler);
+                        this.socket.off("joinedRoom", joinedRoomHandler);
+                    }
+    
+                    const errorHandler = err => {
+                        destroyEvents();
+                        rej(err);
+                    }
+
+                    const joinedRoomHandler = response => {
+                        destroyEvents();
+                        const [userId, userKey] = response;
+                        this.userId = userId;
+                        this.userKey = userKey;
+                        res(response);
+                    }
+
+                    this.socket.on("joinedRoom", joinedRoomHandler);
+                    this.socket.on("error", errorHandler);
+                });
+            }
+
+            createRoom(gameId) {
+                this.socket.emit("createRoom", gameId);
+                
+                return new Promise((res, rej) => {
+                    const destroyEvents = () => {
+                        this.socket.off("error", errorHandler);
+                        this.socket.off("joinedRoom", createdRoomHandler);
+                    }
+                    
+                    const errorHandler = err => {
+                        destroyEvents();
+                        rej(err);
+                    }                   
+                    
+                    const createdRoomHandler = roomId => {
+                        destroyEvents();
+                        this.roomId = roomId;
+                        res(roomId);
+                    }
+                    
+                    this.socket.on("createdRoom", createdRoomHandler);
+                    this.socket.on("error", errorHandler);
+                });
+            }
+
+            emitData(data) {
+                if(!this.userId || !this.roomId) {
+                    throw new Error("client is not authenticated");
+                }
+
+                this.socket.emit("roomData", data);
+            }
+        }
+
+        const config = {
+            "turnBased": true, 
+            "modules": {
+                "username": {
+                    "badWordFilter": true,
+                    "validateExpression": "[a-z_-\.]{20}"
+                }, "randomDice": {
+                    "trigger": "turn_start", // roll the dice at the start of someone's turn
+                    "dice": [
+                        {
+                            "sideCount": 6,
+                            "label": "red"
+                        }, {
+                            "sideCount": 6,
+                            "label": "yellow"
+                        }, {
+                            "sideCount": 6,
+                            "label": "green"
+                        }, {
+                            "sideCount": 6,
+                            "label": "blue"
+                        }, {
+                            "sideCount": 6,
+                            "label": "white1"
+                        }, {
+                            "sideCount": 6,
+                            "label": "white2"
+                        }
+                    ]
+                }, "imageUpload": {
+                    "namingScheme": "userId", // name the images {userId}_1, {userId}_2, etc                    
+                }, "liveData": {
+                    "channels": {
+                        "generalRoll": {
+                            "requireTurn": false, // doesn't have to be their turn
+                            "saveResponse": true,
+                            "public": true // allow all room members to retrieve this data
+                        }, "specialRoll": {
+                            "requireTurn": true,
+                            "saveResponse": true,
+                            "public": true // allow all room members to retrieve this data
+                        }
+                    }
+                }
+            }, 
+            socketTimeout: 2 * 60 * 1000, // 2 minute timeout between disconnect and leave game
+
+        };
+
+        /*
+        
+        meanwhile, in the database...
+
+        User ad8dfw39
+        ...
+        userData: "{'username': 'jarome', specialRoll: ['A3', 'D4']}"
+        ...
+
+
+        Room: 30fjsa
+        roomData: "{'turnBased': true, 'currentTurn': 'ad8dfw39', 'images': ['ad8dfw39_1']}"
+        
+        */
+
+        // const roomId = await connect.createRoom(config);
+
+        // const userId = await connect.joinRoom(roomId);
+
+        // const roomInput = document.getElementById("roomInput");
+        // const roomIdText = document.getElementById("roomIdText");
+        // const createRoom = document.getElementById("createRoom");
+        // const joinRoom = document.getElementById("joinRoom");
+
+        // socket.on("connect", ()=>{
+        //     alert("connected");
+        // }); 
+
+        // createRoom.addEventListener("click", event => {
+        //     socket.emit("createRoom");
+        // });
+
+        // joinRoom.addEventListener("click", event => {
+        //     socket.emit("joinRoom", roomInput.value);
+        // });
+
+        // socket.on("createdRoom", (x)=> {
+        //     roomIdText.innerText = x;
+        // });
+
+        // socket.on("joinedRoom", (x)=>alert("USERID: "+x));
+        // socket.on("error", (x)=>console.log(x));
     </script>
 </body>
 </html>
